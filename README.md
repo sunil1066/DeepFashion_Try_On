@@ -9,6 +9,17 @@ We rearrange the VITON dataset for easy access.
 
 [[Paper]](https://arxiv.org/abs/2003.05863)
 
+
+## Test on small dataset from Dataset_Test
+Need to small down four folders minimum
+- test_color (select number of clothes on which you want to test, for now during testing it apply randomly)
+- After seleting color clothes, select corresponding edge file from test_edge
+- For choosing model on which trial to be perform, choose few from test_img
+- After selecting model images pick corresponding label from test_label folder
+- After doing this step change dir_root argument in base_options.py file
+
+Note: For inference number of images counting on basis of label present in test_label folder
+
 ## Inference
 ```bash
 python test.py

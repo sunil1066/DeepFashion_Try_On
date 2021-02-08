@@ -2,6 +2,8 @@ import argparse
 import os
 from util import util
 import torch
+import json
+
 
 class BaseOptions():
     def __init__(self):
@@ -68,7 +70,8 @@ class BaseOptions():
             torch.cuda.set_device(self.opt.gpu_ids[0])
 
         args = vars(self.opt)
-
+        with open(os.path.join(args['checkpoints_dir'], args['name'], 'iter.json'), 'w') as j:
+            json.dump(args, j , indent=4)
         print('------------ Options -------------')
         for k, v in sorted(args.items()):
             print('%s: %s' % (str(k), str(v)))
