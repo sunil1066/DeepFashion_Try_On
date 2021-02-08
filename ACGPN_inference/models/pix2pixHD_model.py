@@ -29,13 +29,21 @@ def generate_discrete_label(inputs, label_nc, onehot=True, encode=True):
         label_map.append(p)
     label_map = torch.stack(label_map, 0)
     if not onehot:
-        return label_map.float().cuda()
+        if torch.cuda.is_available():
+            return label_map.float().cuda()
+        else:
+            return label_map.float()
+
     size = label_map.size()
     oneHot_size = (size[0], label_nc, size[2], size[3])
-    input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-    input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
-
+    if torch.cuda.is_available():
+        input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+        input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+    else:
+        input_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_()
+        input_label = input_label.scatter_(1, label_map.data.long(), 1.0)
     return input_label
+
 def morpho(mask,iter,bigger=True):
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
     new=[]
@@ -50,7 +58,10 @@ def morpho(mask,iter,bigger=True):
         tem=tem.reshape(1,256,192)
         new.append(tem.astype(np.float64)/255.0)
     new=np.stack(new)
-    new=torch.FloatTensor(new).cuda()
+    if torch.cuda.is_available():
+        new=torch.FloatTensor(new).cuda()
+    else:
+        new=torch.FloatTensor(new)
     return new
 
 def morpho_smaller(mask,iter,bigger=True):
@@ -67,15 +78,22 @@ def morpho_smaller(mask,iter,bigger=True):
         tem=tem.reshape(1,256,192)
         new.append(tem.astype(np.float64)/255.0)
     new=np.stack(new)
-    new=torch.FloatTensor(new).cuda()
+    if torch.cuda.is_available():
+        new=torch.FloatTensor(new).cuda()
+    else:
+        new=torch.FloatTensor(new)
     return new
 
 
 def encode(label_map, size):
     label_nc = 14
     oneHot_size = (size[0], label_nc, size[2], size[3])
-    input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-    input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+    if torch.cuda.is_available():
+        input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+        input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+    else:
+        input_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_()
+        input_label = input_label.scatter_(1, label_map.data.long(), 1.0)
     return input_label
 
 
@@ -118,7 +136,10 @@ class Pix2PixHDModel(BaseModel):
         return loss
 
     def ger_average_color(self, mask, arms):
-        color = torch.zeros(arms.shape).cuda()
+        if torch.cuda.is_available():
+            color = torch.zeros(arms.shape).cuda()
+        else:
+            color = torch.zeros(arms.shape)
         for i in range(arms.shape[0]):
             count = len(torch.nonzero(mask[i, :, :, :]))
             if count < 10:
@@ -217,14 +238,24 @@ class Pix2PixHDModel(BaseModel):
 
         size = label_map.size()
         oneHot_size = (size[0], 14, size[2], size[3])
-        input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-        input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
+        if torch.cuda.is_available():
+            input_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+            input_label = input_label.scatter_(1, label_map.data.long().cuda(), 1.0)
 
-        masked_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-        masked_label = masked_label.scatter_(1, (label_map * (1 - clothes_mask)).data.long().cuda(), 1.0)
+            masked_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+            masked_label = masked_label.scatter_(1, (label_map * (1 - clothes_mask)).data.long().cuda(), 1.0)
 
-        c_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
-        c_label = c_label.scatter_(1, all_clothes_label.data.long().cuda(), 1.0)
+            c_label = torch.cuda.FloatTensor(torch.Size(oneHot_size)).zero_()
+            c_label = c_label.scatter_(1, all_clothes_label.data.long().cuda(), 1.0)
+        else:
+            input_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_()
+            input_label = input_label.scatter_(1, label_map.data.long(), 1.0)
+
+            masked_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_()
+            masked_label = masked_label.scatter_(1, (label_map * (1 - clothes_mask)).data.long(), 1.0)
+
+            c_label = torch.FloatTensor(torch.Size(oneHot_size)).zero_()
+            c_label = c_label.scatter_(1, all_clothes_label.data.long(), 1.0)
 
         input_label = Variable(input_label)
 
@@ -267,7 +298,11 @@ class Pix2PixHDModel(BaseModel):
         noise = cv2.randn(noise, 0, 255)
         noise = np.asarray(noise / 255, dtype=np.uint8)
         noise = torch.tensor(noise, dtype=torch.float32)
-        return noise.cuda()
+        if torch.cuda.is_available():
+            return noise.cuda()
+        else:
+            return noise
+
     def multi_scale_blend(self,fake_img,fake_c,mask,number=4):
         alpha=[0,0.1,0.3,0.6,0.9]
         smaller=mask
@@ -283,9 +318,14 @@ class Pix2PixHDModel(BaseModel):
     def forward(self, label, pre_clothes_mask, img_fore, clothes_mask, clothes, all_clothes_label, real_image, pose,grid,mask_fore):
         # Encode Inputs
         input_label, masked_label, all_clothes_label = self.encode_input(label, clothes_mask, all_clothes_label)
-        arm1_mask = torch.FloatTensor((label.cpu().numpy() == 11).astype(np.float)).cuda()
-        arm2_mask = torch.FloatTensor((label.cpu().numpy() == 13).astype(np.float)).cuda()
-        pre_clothes_mask=torch.FloatTensor((pre_clothes_mask.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        if torch.cuda.is_available():
+            arm1_mask = torch.FloatTensor((label.cpu().numpy() == 11).astype(np.float)).cuda()
+            arm2_mask = torch.FloatTensor((label.cpu().numpy() == 13).astype(np.float)).cuda()
+            pre_clothes_mask=torch.FloatTensor((pre_clothes_mask.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        else:
+            arm1_mask = torch.FloatTensor((label.cpu().numpy() == 11).astype(np.float))
+            arm2_mask = torch.FloatTensor((label.cpu().numpy() == 13).astype(np.float))
+            pre_clothes_mask=torch.FloatTensor((pre_clothes_mask.detach().cpu().numpy() > 0.5).astype(np.float))            
         clothes = clothes * pre_clothes_mask
 
         shape = pre_clothes_mask.shape
@@ -303,11 +343,19 @@ class Pix2PixHDModel(BaseModel):
         fake_cl = self.sigmoid(fake_cl)
         CE_loss += self.BCE(fake_cl, clothes_mask) * 10
 
-        fake_cl_dis = torch.FloatTensor((fake_cl.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        if torch.cuda.is_available():
+            fake_cl_dis = torch.FloatTensor((fake_cl.detach().cpu().numpy() > 0.5).astype(np.float)).cuda()
+        else:
+            fake_cl_dis = torch.FloatTensor((fake_cl.detach().cpu().numpy() > 0.5).astype(np.float))
         fake_cl_dis=morpho(fake_cl_dis,1,True)
 
-        new_arm1_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 11).astype(np.float)).cuda()
-        new_arm2_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 13).astype(np.float)).cuda()
+        if torch.cuda.is_available():
+            new_arm1_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 11).astype(np.float)).cuda()
+            new_arm2_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 13).astype(np.float)).cuda()
+        else:
+            new_arm1_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 11).astype(np.float))
+            new_arm2_mask = torch.FloatTensor((armlabel_map.cpu().numpy() == 13).astype(np.float))    
+
         fake_cl_dis=fake_cl_dis*(1- new_arm1_mask)*(1-new_arm2_mask)
         fake_cl_dis*=mask_fore
 

@@ -60,7 +60,11 @@ class BaseModel(torch.nn.Module):
         else:
             #network.load_state_dict(torch.load(save_path))
 
-            network.load_state_dict(torch.load(save_path))
+            if torch.cuda.is_available():
+                map_location=lambda storage, loc: storage.cuda()
+            else:
+                map_location='cpu'
+            network.load_state_dict(torch.load(save_path, map_location=map_location))
             # except:
             #     pretrained_dict = torch.load(save_path)
             #     model_dict = network.state_dict()

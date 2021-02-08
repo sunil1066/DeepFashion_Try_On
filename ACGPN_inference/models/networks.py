@@ -58,20 +58,26 @@ def define_G(input_nc, output_nc, ngf, netG, L=1, S=1, n_downsample_global=3, n_
 
 def define_Unet(input_nc, gpu_ids=[]):
     netG = Unet(input_nc)
-    netG.cuda(gpu_ids[0])
+    if len(gpu_ids) > 0:
+        assert (torch.cuda.is_available())
+        netG.cuda(gpu_ids[0])
     netG.apply(weights_init)
     return netG
 
 
 def define_UnetMask(input_nc, gpu_ids=[]):
     netG = UnetMask(input_nc,output_nc=4)
-    netG.cuda(gpu_ids[0])
+    if len(gpu_ids) > 0:
+        assert (torch.cuda.is_available())
+        netG.cuda(gpu_ids[0])
     netG.apply(weights_init)
     return netG
 
 def define_Refine(input_nc, output_nc, gpu_ids=[]):
     netG = Refine(input_nc, output_nc)
-    netG.cuda(gpu_ids[0])
+    if len(gpu_ids) > 0:
+        assert (torch.cuda.is_available())
+        netG.cuda(gpu_ids[0])
     netG.apply(weights_init)
     return netG
 
@@ -198,7 +204,10 @@ class GANLoss(nn.Module):
 class VGGLossWarp(nn.Module):
     def __init__(self, gpu_ids):
         super(VGGLossWarp, self).__init__()
-        self.vgg = Vgg19().cuda()
+        if torch.cuda.is_available():
+            self.vgg = Vgg19().cuda()
+        else:
+            self.vgg = Vgg19()
         self.criterion = nn.L1Loss()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
@@ -212,7 +221,10 @@ class VGGLossWarp(nn.Module):
 class VGGLoss(nn.Module):
     def __init__(self, gpu_ids):
         super(VGGLoss, self).__init__()
-        self.vgg = Vgg19().cuda()
+        if torch.cuda.is_available():
+            self.vgg = Vgg19().cuda()
+        else:
+            self.vgg = Vgg19()
         self.criterion = nn.L1Loss()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
@@ -233,7 +245,10 @@ class VGGLoss(nn.Module):
 class StyleLoss(nn.Module):
     def __init__(self, gpu_ids):
         super(StyleLoss, self).__init__()
-        self.vgg = Vgg19().cuda()
+        if torch.cuda.is_available():
+            self.vgg = Vgg19().cuda()
+        else:
+            self.vgg = Vgg19()
         self.weights = [1.0 / 32, 1.0 / 16, 1.0 / 8, 1.0 / 4, 1.0]
 
     def forward(self, x, y):
@@ -1513,8 +1528,12 @@ class BoundedGridLocNet(nn.Module):
         # coor+=torch.randn(coor.shape).cuda()/10
         row=self.get_row(coor,5)
         col=self.get_col(coor,5)
-        rx,ry,cx,cy=torch.tensor(0.08).cuda(),torch.tensor(0.08).cuda()\
-            ,torch.tensor(0.08).cuda(),torch.tensor(0.08).cuda()
+        if torch.cuda.is_available():
+            rx,ry,cx,cy=torch.tensor(0.08).cuda(),torch.tensor(0.08).cuda()\
+                ,torch.tensor(0.08).cuda(),torch.tensor(0.08).cuda()
+        else:
+            rx,ry,cx,cy=torch.tensor(0.08),torch.tensor(0.08)\
+                ,torch.tensor(0.08),torch.tensor(0.08)
         row_x,row_y=row[:,:,0],row[:,:,1]
         col_x,col_y=col[:,:,0],col[:,:,1]
         rx_loss=torch.max(rx,row_x).mean()
